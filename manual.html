@@ -25,15 +25,18 @@
 <p>常规由销售或财务导入；当前审核测试角色也可以导入。</p>
 <ol>
 <li>点击右上角“导入 Invoice”。</li>
-<li>选择 QuickBooks 产品明细 XLS 或 UTF-8 CSV 文件。</li>
+<li>选择 QuickBooks 原始 Invoice PDF，或产品明细 XLS / UTF-8 CSV 文件。</li>
 <li>点击“读取并预览产品”，核对产品、数量、销售单价及行金额。</li>
-<li>填写 Invoice 编号和客户名称。导出文件可能没有这些信息，须从实际 Invoice 补充。</li>
+<li>PDF 会填入识别到的 Invoice 编号、客户候选名称、日期和税率，逐项与原件核对。XLS / CSV 缺少这些信息时须补填。</li>
 <li>可填发票日期、付款到期日、销售币种和统一销售税率；未知留空。</li>
 <li>可附 Invoice 截图或其他来源文件。</li>
-<li>点击“确认导入，交销售补充”。所有产品进入“制作类型待补充”。</li>
+<li>PDF 须勾选已核对识别结果和全部提示，再点击“确认导入，交销售补充”。所有产品进入“制作类型待补充”。</li>
 </ol>
-<p>产品表头须为：<code>PRODUCT/SERVICE, DESCRIPTION, QUANTITY, RATE, AMOUNT, SALES TAX</code>。本版支持1至50项产品及整数数量，并核对数量乘以售价是否等于行金额。单个来源文件最大10MB，可额外附5个来源文件，总量最大20MB。</p>
-<p>统一税率只适用于所有行采用相同税率的未税金额。混合税率、折扣或特殊金额请先核实，不能勉强套用。截图作为原件归档，不自动识别内容。</p>
+<p>XLS / CSV 产品表头须为：<code>PRODUCT/SERVICE, DESCRIPTION, QUANTITY, RATE, AMOUNT, SALES TAX</code>。本版支持1至50项产品及整数数量，并核对数量乘以售价是否等于行金额。单个来源文件最大10MB，可额外附5个来源文件，总量最大20MB。</p>
+<p>PDF 支持可复制文字的 QuickBooks 发票同版式（Bill to、Ship to、Invoice #、Description / Qty / Rate / Tax / Amount），最多10页。解析器会核对每行金额、小计、税额及总额；不支持的版式、无法归属的跨页说明、折扣等无法核对的金额会停止导入，改用 XLS / CSV。扫描件和截图不自动识别。</p>
+<p>PDF 日期如 <code>05/11/2026</code> 有日月歧义，先按 QuickBooks 实际设置选择“日/月/年”或“月/日/年”，再重新读取。保留原日期文字，不能根据 Invoice 编号推算日期。描述 Qty 与数量栏不一致时会提醒，导入采用数量栏并保留完整描述。PDF 只显示 $ 时，币种不会自动推断。</p>
+<p>PDF 原件随订单保存，Bill to / Ship to、付款条款、原 Ship date、Ship via、Tracking、REP、PO 及识别提示可在“Invoice 与来源”查看。REP 可填入销售负责人；Ship date 不作交货要求，原 Tracking 不自动建立海运批次，TOTAL DUE 不作付款到期日。未显示的付款日期仍留空。</p>
+<p>统一税率只适用于所有行采用相同税率的未税金额。PDF 保留原税额及合计；若手填税率计算值与 PDF 不符会提示核对。混合税率可保留原税额而将统一税率留空。截图作为原件归档，不自动识别内容。</p>
 <p>同一 Invoice 编号不能重复建档，已有订单应打开原档案。无导出文件时可点“手动录入”，后续仍按产品补制作类型。</p>
 <p><strong>字段区别：</strong>Invoice RATE 是销售单价，不是采购成本；付款到期日不是要求交货日期。文件导入不会自动回写 QuickBooks，也不代表已收付款、已确认库存或已发货。</p>
 </section>

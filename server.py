@@ -402,7 +402,7 @@ def mutate(db, path, payload):
     if path == "/api/import-preview":
         check_role(actor, ["销售", "财务"])
         from invoice_import import parse_export
-        return parse_export(payload.get("file", {}))
+        return parse_export(payload.get("file", {}), payload.get("pdf_date_order", ""))
     if path == "/api/import-invoice":
         from invoice_import import save_invoice
         import sys

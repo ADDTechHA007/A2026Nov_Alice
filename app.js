@@ -98,7 +98,7 @@ function render() {
           <a class="manual-top" href="/manual.html" target="_blank">工作台手册</a><button class="icon-only" data-action="refresh" title="刷新资料" aria-label="刷新资料">${icon('refresh')}</button><button class="primary" data-action="import-invoice" ${!canActAs('销售','财务')?'disabled':''}>${icon('upload')} 导入 Invoice</button><button class="small" data-action="new-order" ${!canActAs('销售')?'disabled':''}>手动录入</button></div></header>
       <p class="intro">把资料、邮件和审批放在一起，让每一笔订单的下一步都清楚。</p>
       ${data.mode==='public-demo'?`<div class="trial-notice" role="note"><b>在线试用 · 无需登录 · 请选择“审核”操作全部环节</b><p>你与同事共用测试订单；持有网址的人均可查看、修改和导出。仅用演示资料。对方操作后，点右上角“刷新资料”查看更新，先保存自己的输入。${data.ephemeral_storage?'服务重启或重新部署后测试记录可能清空，结束前请“导出订单与附件”。':''}</p></div>`:''}
-      <div class="notice"><span class="dot"></span><span>${data.test_reviewer_full_access?'测试模式：审核角色可操作全部环节，操作仍记录为“审核”；资料校验和流程顺序仍生效。':'先导入 Invoice，再由销售逐项补充制作类型。'}当前支持 XLS / CSV 文件导入，QuickBooks / Yahoo 尚未连接；邮件只生成草稿。</span></div>
+      <div class="notice"><span class="dot"></span><span>${data.test_reviewer_full_access?'测试模式：审核角色可操作全部环节，操作仍记录为“审核”；资料校验和流程顺序仍生效。':'先导入 Invoice，再由销售逐项补充制作类型。'}支持 QuickBooks PDF / XLS / CSV 文件导入，QuickBooks / Yahoo 尚未连接；邮件只生成草稿。</span></div>
       <div class="stats">
         ${[['all','处理中产品',counts.all,'按产品分别推进','grid'],['mine','我的待办',counts.mine,`当前角色：${role}`,'clock'],['missing','资料尚未齐全',counts.missing,'缺项交给对应负责人','alert'],['boss','等待老板审批',counts.boss,'资料已审，可集中批准','shield']].map(([f,label,n,hint,ic])=>`<button class="stat ${filter===f?'active':''}" data-filter="${f}"><span class="stat-label">${label}<span class="stat-icon">${icon(ic)}</span></span><strong>${n.toString().padStart(2,'0')}</strong><small>${esc(hint)}</small></button>`).join('')}
       </div>
@@ -138,10 +138,10 @@ function sourcesPanel(o) {
   const s=o.source;
   const imgs=o.source_documents.filter(d=>d.mime.startsWith('image/'));
   return `<div class="card-title"><h3>原始 Invoice 与核对资料</h3><span class="badge green">${s.lines.length} 项产品 · 行金额已核对</span></div><p class="helper">当前规则：制作类型由销售选择。以下资料保留导入时点原文，后续规则调整和确认见“操作历史”。</p>
-    <div class="source-contact-grid"><div class="source-contact"><small>客户与联系方式</small><h3>${esc(o.customer)}</h3><p>${esc(s.contact)}<br>${esc(s.customer_email)}</p><small>发票日期：${esc(s.invoice_date)}</small></div><div class="source-contact"><small>Ship to · 截图所示收货地址</small><p class="preserve-lines">${esc(s.ship_to)}</p></div></div>
+    <div class="source-contact-grid"><div class="source-contact"><small>客户与联系方式</small><h3>${esc(o.customer)}</h3><p>${esc(s.contact)}<br>${esc(s.customer_email)}</p><small>发票日期：${esc(s.invoice_date||'待确认')}</small>${s.source_format==='pdf'?`<p class="preserve-lines">Bill to：\n${esc(s.bill_to)}</p>`:''}</div><div class="source-contact"><small>Ship to · 来源文件收货地址</small><p class="preserve-lines">${esc(s.ship_to)}</p>${s.source_format==='pdf'?`<p>原发货日期：${esc(s.shipping_date||s.pdf_extracted?.shipping_date_raw||'未显示')}<br>Ship via：${esc(s.ship_via||'未显示')}<br>Tracking：${esc(s.tracking_no||'未显示')}<br>REP：${esc(s.rep||'未显示')}<br>PO：${esc(s.po||'未显示')}</p><small>仅保留原发票字段，不自动生成运输批次或确认发货。</small>`:''}</div></div>
     <div class="source-table-wrap"><table class="source-table"><thead><tr><th>产品 / 原始 SKU</th><th>原数量</th><th>销售单价</th><th>未税金额</th><th>税码</th></tr></thead><tbody>${s.lines.map(i=>`<tr><td><b>${esc(i.name)}</b><small>${esc(i.product_service)}</small></td><td>${fmtQty(i.qty)}</td><td>${salesMoney(i.sales_rate)}</td><td>${salesMoney(i.sales_amount)}</td><td>${esc(i.tax_code)}</td></tr>`).join('')}</tbody></table></div>
-    <div class="source-reconciliation"><h3>金额核对</h3>${s.reconciliation.map(t=>`<p>${icon('check')}${esc(t)}</p>`).join('')}<small>${s.snapshot_balance_due?'截图应收余额：'+salesMoney(s.snapshot_balance_due)+'；':''}当前付款状态仍需财务核实。税率人工填写时，合计仅为按该税率计算的结果。</small></div>
-    <div class="source-pending"><h3>导入时未确认的事项</h3><ul>${s.pending.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><p>履行方式依据：${esc(s.route_basis)}</p><p>截图可见付款条款：${esc(s.terms_visible)}（原文未完整显示）。</p></div>
+    <div class="source-reconciliation"><h3>金额核对</h3>${s.reconciliation.map(t=>`<p>${icon('check')}${esc(t)}</p>`).join('')}<small>${s.snapshot_balance_due?'来源时点应收余额：'+salesMoney(s.snapshot_balance_due)+'；':''}当前付款状态仍需财务核实。${s.source_format==='pdf'?'合计和税额保留 PDF 原值，已与明细核对。':'税率人工填写时，合计仅为按该税率计算的结果。'}</small></div>
+    <div class="source-pending"><h3>导入时未确认的事项</h3><ul>${s.pending.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><p>履行方式依据：${esc(s.route_basis)}</p><p class="preserve-lines">来源可见付款条款：${esc(s.terms_visible||'未显示')}${s.terms_visible&&!s.terms_complete?'（原文未完整显示）':''}</p></div>
     <div class="card-title" style="margin-top:22px"><h3>订单共用来源文件 · ${o.source_documents.length}</h3><small>所有产品共用，不重复上传</small></div>
     ${o.source_documents.map(d=>`<div class="doc">${icon('file')}<div class="doc-info"><a href="/api/order-document/${d.id}" download>${esc(d.name)}</a><small>${esc(d.category)} · ${fmtSize(d.size)} · 导入时保留原文件</small></div>${d.mime.startsWith('image/')?`<button class="small" data-source-image="${d.id}">预览</button>`:''}</div>`).join('')}
     <div class="source-images">${imgs.map(d=>`<button class="source-image-card" data-source-image="${d.id}"><img src="/api/order-image/${d.id}" alt="${esc(d.category)}" loading="lazy"><span>${esc(d.category)} · 点击放大</span></button>`).join('')}</div>
@@ -231,7 +231,30 @@ function newOrder() {
 }
 function importModal() {
   importFile=null;importPreview=null;
-  showModal('第一步 · 导入 Invoice',`<form id="import-form" class="modal-body"><p>上传 QuickBooks 产品明细 XLS / UTF-8 CSV。先预览产品，再补充文件中没有的 Invoice 编号和客户。制作类型留给销售逐项填写。</p><div class="form-grid"><label class="field wide"><span>产品明细文件（XLS / CSV，最大10MB）</span><input id="invoice-file" type="file" accept=".xls,.csv" required></label><div class="wide"><button type="button" data-action="preview-import">读取并预览产品</button></div></div><div id="import-preview"></div><div class="form-grid" style="margin-top:18px">${field('Invoice 编号','invoice','','text',false,false,'required maxlength="100"')}${field('客户名称','customer','','text',false,false,'required maxlength="200"')}${field('发票日期（可留空）','invoice_date','','date')}${field('付款到期日（不是交货日）','payment_due','','date')}<label class="field"><span>销售币种</span><select name="currency"><option value="">待确认</option><option>CAD</option><option>USD</option><option>CNY</option></select></label>${field('统一销售税率 %（未知留空）','tax_rate','','number',false,false,'min="0" max="100" step="0.01" placeholder="例如 13"')}<label class="field wide"><span>Invoice 截图 / 其他来源（可选，最多5个；总文件量20MB）</span><input name="attachments" type="file" multiple></label></div><p class="helper">税率仅适用于所有行采用同一税率的未税金额。混合税率请留空，待财务核对。产品售价和采购成本分别登记；不会推断库存、付款或制作类型。</p><div class="error" id="modal-error"></div></form>`,footer('确认导入，交销售补充','import-form'));
+  showModal('第一步 · 导入 Invoice',`<form id="import-form" class="modal-body">
+    <p>上传 QuickBooks 原始 Invoice PDF，自动提取抬头、日期和产品，核对后确认；也保留产品明细 XLS / UTF-8 CSV 导入。制作类型由销售逐项填写。</p>
+    <div class="form-grid"><label class="field wide"><span>Invoice 文件（PDF / XLS / CSV，最大10MB）</span><input id="invoice-file" type="file" accept=".pdf,.xls,.csv" required></label>
+      <label class="field wide" id="pdf-date-control" hidden><span>PDF 日期格式（按 QuickBooks 实际设置选择）</span><select name="pdf_date_order"><option value="">未确认，先读取查看</option><option value="dmy">日/月/年：05/11/2026 = 2026年11月5日</option><option value="mdy">月/日/年：05/11/2026 = 2026年5月11日</option></select></label>
+      <div class="wide"><button type="button" data-action="preview-import">读取并预览产品</button></div></div>
+    <div id="import-preview"></div><div class="form-grid" style="margin-top:18px">
+      ${field('Invoice 编号','invoice','','text',false,false,'required maxlength="100"')}${field('客户名称（请核对）','customer','','text',false,false,'required maxlength="200"')}
+      ${field('发票日期（可留空）','invoice_date','','date')}${field('付款到期日（不是交货日）','payment_due','','date')}
+      <label class="field"><span>销售币种</span><select name="currency"><option value="">待确认</option><option>CAD</option><option>USD</option><option>CNY</option></select></label>
+      ${field('统一销售税率 %（未知留空）','tax_rate','','number',false,false,'min="0" max="100" step="0.01" placeholder="例如 13"')}
+      <label class="field wide"><span>其他来源附件（可选，最多5个；总文件量20MB）</span><input name="attachments" type="file" multiple></label></div>
+    <p class="helper">PDF 仅支持可复制文字的 QuickBooks 同版式发票，扫描件和截图不自动识别。PDF 税额、总额保留原值并核对；币种未显示时留待确认。不会用销售价代替成本，也不会自动确认库存、付款或发货。</p>
+    <label class="checkbox" id="pdf-review-control" hidden><input name="confirm_pdf_review" type="checkbox" disabled required>我已核对 PDF 原件、抬头、日期、数量和所有提示，确认按数量栏导入。</label>
+    <div class="error" id="modal-error"></div></form>`,footer('确认导入，交销售补充','import-form'));
+}
+function showImportPreview() {
+  const p=importPreview,x=p.extracted;
+  $('#import-preview').innerHTML=`<div class="import-result"><h3>${p.lines.length} 项产品 · 未税合计 ${salesMoney(p.subtotal)}</h3>${p.lines.map(l=>`<p>${esc(l.name)} · ${fmtQty(l.qty)} 个 · ${salesMoney(l.sales_rate)} / 个</p>`).join('')}${x?`<p>PDF 税额 ${salesMoney(x.tax_amount)} · 总额 ${salesMoney(x.total)}</p><details open><summary>识别到的发票资料（请核对）</summary><p>编号：${esc(x.invoice)}<br>发票原日期：${esc(x.invoice_date_raw)}<br>销售 REP：${esc(x.rep||'未显示')}</p><p class="preserve-lines">Bill to：\n${esc(x.bill_to)}\n\nShip to：\n${esc(x.ship_to)}\n\n付款条款：\n${esc(x.terms||'未显示')}</p><p>Ship date：${esc(x.shipping_date_raw||'未显示')} · Ship via：${esc(x.ship_via||'未显示')}<br>Tracking：${esc(x.tracking_no||'未显示')} · PO：${esc(x.po||'未显示')}</p></details><div class="pdf-import-warnings"><b>导入前核对</b><ul>${p.warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`:''}<span class="badge amber">全部产品：制作类型待补充</span></div>`;
+  for(const name of ['invoice','customer','invoice_date','payment_due','currency','tax_rate']){
+    const input=$(`#import-form [name=${name}]`),value=x?.[name]||'';
+    if(!input.value||input.value===input.dataset.autoValue){input.value=value;input.dataset.autoValue=value;}
+  }
+  $('#pdf-review-control').hidden=!x;
+  const review=$('#import-form [name=confirm_pdf_review]');review.disabled=!x;review.checked=false;
 }
 async function readFilePayload(file) {
   if(!file?.size||file.size>10*1024*1024)throw new Error('请选择一个不超过10MB的文件。');
@@ -302,8 +325,8 @@ document.addEventListener('click',async e=>{
     try{
       $('#modal-error').textContent='';importPreview=null;
       importFile=await readFilePayload($('#invoice-file').files[0]);
-      importPreview=await api('/api/import-preview',{file:importFile});
-      $('#import-preview').innerHTML=`<div class="import-result"><h3>${importPreview.lines.length} 项产品 · 未税合计 ${salesMoney(importPreview.subtotal)}</h3>${importPreview.lines.map(l=>`<p>${esc(l.name)} · ${fmtQty(l.qty)} 个 · ${salesMoney(l.sales_rate)} / 个</p>`).join('')}<span class="badge amber">全部产品：制作类型待补充</span></div>`;
+      importPreview=await api('/api/import-preview',{file:importFile,pdf_date_order:$('#import-form [name=pdf_date_order]').value});
+      showImportPreview();
     }catch(err){$('#modal-error').textContent=err.message;}finally{b.disabled=false;}
     return;
   }
@@ -339,7 +362,12 @@ document.addEventListener('click',async e=>{
   });
 });
 const $$=(q,root=document)=>Array.from(root.querySelectorAll(q));
-document.addEventListener('change',e=>{if(e.target.closest('#item-form'))updateExecutionSaveStatus();if(e.target.matches('#production-form [name=route]')){e.target.className=routeTone(e.target.value);$$('.production-guide [data-production-route]').forEach(card=>card.classList.toggle('is-selected',card.dataset.productionRoute===e.target.value));}if(e.target.id==='role'){role=e.target.value;localStorage.setItem('ecobag-demo-role',role);render();}if(e.target.id==='invoice-file'){importFile=null;importPreview=null;$('#import-preview').innerHTML='';}});
+document.addEventListener('change',e=>{if(e.target.closest('#item-form'))updateExecutionSaveStatus();if(e.target.matches('#production-form [name=route]')){e.target.className=routeTone(e.target.value);$$('.production-guide [data-production-route]').forEach(card=>card.classList.toggle('is-selected',card.dataset.productionRoute===e.target.value));}if(e.target.id==='role'){role=e.target.value;localStorage.setItem('ecobag-demo-role',role);render();}if(e.target.id==='invoice-file'){
+  importFile=null;importPreview=null;$('#import-preview').innerHTML='';
+  for(const name of ['invoice','customer','invoice_date','payment_due','currency','tax_rate','pdf_date_order']){const input=$(`#import-form [name=${name}]`);input.value='';delete input.dataset.autoValue;}
+  $('#pdf-date-control').hidden=!/\.pdf$/i.test(e.target.files[0]?.name||'');
+  $('#pdf-review-control').hidden=true;const review=$('#import-form [name=confirm_pdf_review]');review.disabled=true;review.checked=false;
+}if(e.target.matches('#import-form [name=pdf_date_order]')){importPreview=null;$('#import-preview').innerHTML='<p class="helper">日期格式已更改，请重新点击“读取并预览产品”。</p>';$('#import-form [name=confirm_pdf_review]').checked=false;}});
 document.addEventListener('input',e=>{if(e.target.closest('#item-form'))updateExecutionSaveStatus();if(e.target.id==='search'){
   const pos=e.target.selectionStart;search=e.target.value;render();const input=$('#search');input.focus();input.setSelectionRange(pos,pos);
 }});
@@ -359,7 +387,9 @@ document.addEventListener('submit',async e=>{
       await showApprovalSubmission({...pendingOptionalTransition,confirm_optional_missing:true});
       pendingOptionalTransition=null;
     }else if(f.id==='import-form'){
-      if(!importFile||!importPreview)throw new Error('请先读取并预览产品文件。');
+      if(!importFile||!importPreview)throw new Error('请先读取并预览文件。');
+      if(importPreview.extracted?.date_format_required)throw new Error('请先选择 PDF 日期格式，再重新读取并核对。');
+      values.confirm_pdf_review=$('#import-form [name=confirm_pdf_review]').checked;
       const extra=form.getAll('attachments').filter(file=>file.size);
       if(extra.length>5)throw new Error('最多可附5个额外来源文件。');
       const attachments=[];for(const file of extra)attachments.push(await readFilePayload(file));

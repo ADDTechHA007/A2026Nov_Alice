@@ -23,9 +23,19 @@ def decode_file(file):
     return name, data
 
 
-def parse_export(file):
+def parse_export(file, date_order=""):
     name, raw = decode_file(file)
     ext = Path(name).suffix.lower()
+    if ext == ".pdf":
+        sys.path.insert(0, str(Path(__file__).parent / ".read-deps"))
+        from pdf_invoice import parse_pdf
+        try:
+            result = parse_pdf(raw, date_order)
+        except ValueError:
+            raise
+        except Exception:
+            raise ValueError("PDF 解析失败，请使用未加密的 QuickBooks 原始 PDF 或 XLS / CSV。")
+        return {**result, "name": name, "sha256": hashlib.sha256(raw).hexdigest()}
     if ext == ".xls":
         sys.path.insert(0, str(Path(__file__).parent / ".read-deps"))
         try:
@@ -52,7 +62,7 @@ def parse_export(file):
             raise ValueError("CSV 请使用 UTF-8 编码。")
         rows, sheet_name = list(csv.reader(io.StringIO(content))), "CSV"
     else:
-        raise ValueError("本版支持 QuickBooks 产品明细 .xls 或 UTF-8 .csv 文件。")
+        raise ValueError("支持 QuickBooks Invoice .pdf、产品明细 .xls 或 UTF-8 .csv 文件。")
     if not rows or [str(v).strip().upper() for v in rows[0][:6]] != HEADERS:
         raise ValueError("表头应为 PRODUCT/SERVICE、DESCRIPTION、QUANTITY、RATE、AMOUNT、SALES TAX。")
     lines = []
@@ -91,7 +101,12 @@ def save_invoice(db, payload, app):
         raise ValueError("请补充 Invoice 编号及客户名称；产品导出文件通常不含这两项。")
     if db.execute("SELECT 1 FROM orders WHERE invoice=?", (invoice,)).fetchone():
         raise ValueError("这个 Invoice 已有档案，请打开原档案，勿重复导入。")
-    parsed = parse_export(payload.get("file", {}))
+    parsed = parse_export(payload.get("file", {}), payload.get("pdf_date_order", ""))
+    extracted = parsed.get("extracted", {})
+    if extracted.get("date_format_required"):
+        raise ValueError("请先选择 PDF 日期格式（日/月/年或月/日/年），重新读取并核对。")
+    if extracted and not payload.get("confirm_pdf_review"):
+        raise ValueError("请核对 PDF 识别结果、提示和原件，并勾选确认。")
     invoice_date = app.valid_date(payload.get("invoice_date"), required=False)
     payment_due = app.valid_date(payload.get("payment_due"), required=False)
     currency = app.clean(payload.get("currency"))
@@ -122,6 +137,27 @@ def save_invoice(db, payload, app):
         "provenance": {"lines": parsed["name"] + " / " + parsed["sheet"], "customer_and_dates": "导入表单人工填写；不会将付款到期日写成交货日"},
         "lines": parsed["lines"], "imported_at": app.now(), "workflow_policy": "sales-production-type-v2"
     }
+    if extracted:
+        if rate is not None and tax != Decimal(extracted["tax_amount"]):
+            raise ValueError("填写税率算出的税额与 PDF 原税额不一致，请核对；保留 PDF 原税额时可清空税率。")
+        metadata.update({
+            "source_format": "pdf", "pdf_extracted": extracted, "pdf_date_order": payload.get("pdf_date_order", ""),
+            "contact": extracted.get("contact", ""), "bill_to": extracted.get("bill_to", ""),
+            "ship_to": extracted.get("ship_to", ""), "tax_amount": extracted["tax_amount"],
+            "total": extracted["total"], "tax_label": extracted["tax_label"], "tax_rows": extracted["tax_rows"],
+            "snapshot_balance_due": extracted.get("balance_due"), "terms_visible": extracted.get("terms", ""),
+            "terms_complete": True, "shipping_date": extracted.get("shipping_date", ""),
+            "tracking_no": extracted.get("tracking_no", ""), "ship_via": extracted.get("ship_via", ""),
+            "rep": extracted.get("rep", ""), "po": extracted.get("po", ""),
+            "pending": metadata["pending"] + extracted["warnings"],
+            "pdf_review": {"confirmed": True, "actor": payload["actor"], "at": app.now(),
+                           "confirmed_fields": {"invoice": invoice, "customer": customer, "invoice_date": invoice_date,
+                                                "payment_due": payment_due, "currency": currency, "tax_rate": rate_text}},
+        })
+        metadata["provenance"]["customer_and_dates"] = "PDF 文字识别后在导入表单核对；原始识别值及确认值分别留存，不推算付款或交货日期"
+        if extracted.get("rep"):
+            metadata["pending"][0] = "每项产品制作类型待补充；销售负责人来自 PDF REP，请核对"
+        metadata["reconciliation"].append(f"PDF 小计 {parsed['subtotal']} + 税额 {extracted['tax_amount']} = 总额 {extracted['total']}")
     files = [payload["file"], *payload.get("attachments", [])]
     if len(files) > 6:
         raise ValueError("可附最多5个额外来源文件。")
@@ -133,7 +169,7 @@ def save_invoice(db, payload, app):
     if sum(len(s[1]) for s in sources) > 20 * 1024 * 1024:
         raise ValueError("来源文件合计不能超过20MB。")
     oid = app.uid()
-    db.execute("INSERT INTO orders VALUES(?,?,?,?,?,?)", (oid, invoice, customer, "待确认", "", app.now()))
+    db.execute("INSERT INTO orders VALUES(?,?,?,?,?,?)", (oid, invoice, customer, extracted.get("rep") or "待确认", "", app.now()))
     db.execute("INSERT INTO order_details VALUES(?,?)", (oid, json.dumps(metadata, ensure_ascii=False)))
     for n, line in enumerate(parsed["lines"], 1):
         iid = app.uid()
