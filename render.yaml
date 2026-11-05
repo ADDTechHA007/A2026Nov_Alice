@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ecobag-workbench-trial
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u server.py
+    healthCheckPath: /healthz
+    autoDeployTrigger: "off"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.9
+      - key: WORKBENCH_PUBLIC_DEMO
+        value: "1"
+      - key: WORKBENCH_EPHEMERAL_STORAGE
+        value: "1"
